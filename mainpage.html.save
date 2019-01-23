@@ -1,0 +1,208 @@
+<!DOCTYPE html> <!-- Created By: David Martellock Purpose: to be a front end communication interface for a webserver on a raspberry pi
+	to be communicated with by  an android application
+	
+Strategy:
+	Step one, Turn on bluetooth and set the default agent or whatever.
+	first it kicks off and runs a python program in the background that is a continuous BLE monitor
+	ANDROID COMMS: android can set js variables in a webview by calling the javascript 
+	WRITE TO MICROCONTROLLER: if a "Write" flag is set + charachteristic specification + the value to be set
+			then it will send out a call to a yaml python parser with that information that will write to the yaml file.
+			That change will be handled by the BLE monitor to get the written information to the microcontroller.
+	Read from microcontroller: (NAIVE) this file just displays whatever variables are set in the YAML file, the BLE monitor will set these 
+			to be initial values upon starting and will keep any changes updated by using the "Notify" function 
+	
+
+-->
+<html>
+<body>
+
+<h1 id="titlestring">If you can see this, hello browser user!</h1>
+
+<p>Volume: </p>
+<p id="char1"></p>
+<p>Next Track</p>
+<p id="char2"></p>
+<p>Play/pause</p>
+<p id="char3"></p>
+<p>Mode:</p>
+<p id="char4"></p>
+<p>Brightness:</p>
+<p id="char5"></p>
+<p>Z acceleration:</p>
+<p id="char6"></p>
+<p>Tip Sensor:</p>
+<p id="char7"></p>
+
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+
+<p id="one">testingobjects</p>
+<p id="two">testingobjects</p>
+<p id="three">testingobjects</p>
+
+
+
+<script src="bundle.js"></script>
+<script type="text/javascript">
+	//variables:
+	var myobj = {write : 0,
+			chartochange : 0,
+			charval : 0,				
+			};
+	var acceldata;
+	//UUID's as strings for seperation:
+	var volumeuuid = "babe1121-0000-0000-0001-000000000001:";
+	var nexttrackuuid = "babe1122-0000-0000-0001-000000000002:"; 
+	var playstopuuid = "babe1123-0000-0000-0001-000000000003:"; 
+	var modeuuid = "babe1124-0000-0000-0001-000000000004:"; 
+	var brightuuid = "babe1125-0000-0000-0001-000000000005:";
+	var acceluuid = "babe1131-0000-0000-0002-000000000001:"; 
+
+	//dependancies:
+	yaml = require('js-yaml'); //this is only possible because of the browserify
+				//command:
+				//browserify -r //node module name// -r ./requiredfile that declares it > bundle.js
+	yamljs = require('yamljs');	
+	fs = require('fs'); // doesnt seem to work...
+	readyaml = require('read-yaml');	
+
+
+	//WORKS! - use this to read yaml files!	
+	file = yamljs.load('variables.yml');//creates a native object
+		
+	//make it stringy:
+	var yamlString = yamljs.stringify(file,4);
+	
+	//make it objecty again:
+//	var yamlparsed = yamljs.parse(yamlString);
+	
+	
+	//search and cut portions of the strings we want.
+	var valuedict = {volume : yamlString.substring(yamlString.indexOf(volumeuuid)+38,yamlString.indexOf(nexttrackuuid)),
+			nexttrack : yamlString.substring(yamlString.indexOf(nexttrackuuid)+38,yamlString.indexOf(playstopuuid)),
+			playstop : yamlString.substring(yamlString.indexOf(playstopuuid)+38,yamlString.indexOf(modeuuid)),
+			mode : yamlString.substring(yamlString.indexOf(modeuuid)+38,yamlString.indexOf(brightuuid)),
+			brightness : yamlString.substring(yamlString.indexOf(brightuuid)+38,yamlString.indexOf(acceluuid)),
+			acceleration : yamlString.substring(yamlString.indexOf(acceluuid)+38)};
+	
+
+	document.getElementById("char1").innerHTML = valuedict.volume;
+	document.getElementById("char2").innerHTML = valuedict.nexttrack;
+	document.getElementById("char3").innerHTML = valuedict.playstop;
+	document.getElementById("char4").innerHTML = valuedict.mode;
+	document.getElementById("char5").innerHTML = valuedict.brightness;
+	document.getElementById("char6").innerHTML = valuedict.acceleration;
+	
+	
+
+////////////////////////////////// FUNCTIONS ///////////////////////////////
+	// charchoice and charval both strings.
+	function postData(charchoice, charval) { 
+
+		$.ajax({
+			type: "POST",
+			url: "localhost:5000/writeYaml/"+charchoice+charval,
+			success: callbackFunc(),
+			async:true,
+			error: function(error) {
+				//document.getElementById("one").innerHTML = "Failed yaml write" + error
+				console.log(error);
+			}
+		});
+	}
+
+	function callbackFunc(response){
+		//here we have to update the html to match the thing we just changed.
+		document.getElementById("one").innerHTML = "Callback for python run called" + response ;
+		
+		document.getElementById("char" + myobj.chartochange).innerHTML = myobj.charval;
+		console.log(response);
+	}
+
+
+	function watch(obj, prop, handler) { // make this a framework/global function
+		var currval = obj[prop];
+    		function callback() {
+        		if (obj[prop] != currval) {
+            			var temp = currval;
+            			currval = obj[prop];
+				if(currval == 1){ //this is for the write function
+            				handler(temp, currval);
+				}
+        		}
+    		}
+    		return callback;
+	}
+
+	var myhandler = function (oldval, newval) {
+		// WRITE FUNCTION GOES HERE:
+		myobj.write = 0; //Clean up after on press
+	
+		document.getElementById("one").innerHTML="Handler Fired with:";     		
+		document.getElementById("two").innerHTML= myobj.chartochange;
+		document.getElementById("three").innerHTML= myobj.charval;
+	
+		postData(myobj.chartochange,myobj.charval);
+
+	
+
+
+	};
+
+	function updateHTML() {
+
+		//WORKS! - use this to read yaml files!	
+		file = yamljs.load('variables.yml');//creates a native object
+		
+		//make it stringy:
+		var yamlString = yamljs.stringify(file,4);
+	
+		//search and cut portions of the strings we want.
+		var valuedictnew = {volume : yamlString.substring(yamlString.indexOf(volumeuuid)+38,yamlString.indexOf(nexttrackuuid)),
+			nexttrack : yamlString.substring(yamlString.indexOf(nexttrackuuid)+38,yamlString.indexOf(playstopuuid)),
+			playstop : yamlString.substring(yamlString.indexOf(playstopuuid)+38,yamlString.indexOf(modeuuid)),
+			mode : yamlString.substring(yamlString.indexOf(modeuuid)+38,yamlString.indexOf(brightuuid)),
+			brightness : yamlString.substring(yamlString.indexOf(brightuuid)+38,yamlString.indexOf(acceluuid)),
+			acceleration : yamlString.substring(yamlString.indexOf(acceluuid)+38)};
+
+
+
+		//data passed to acceldata:
+	
+		acceldata = valuedictnew.brightness.substring(4,5);
+
+		document.getElementById("char1").innerHTML = yamlString;
+		document.getElementById("char2").innerHTML = valuedictnew.nexttrack;
+		document.getElementById("char3").innerHTML = valuedictnew.playstop;
+		document.getElementById("char4").innerHTML = valuedictnew.mode;
+		document.getElementById("char5").innerHTML = valuedictnew.brightness;
+		document.getElementById("char6").innerHTML = valuedictnew.acceleration;
+	
+
+
+	}
+
+	function getAccelData(){
+		//see updateHTML above for setting
+		return acceldata;
+	}
+
+	var intervalU = setInterval(updateHTML,500);
+
+	var intervalH = setInterval(watch(myobj, "write", myhandler), 100);
+		
+
+
+
+
+
+
+</script>
+
+
+
+
+
+</body>
+</html>
+
+
