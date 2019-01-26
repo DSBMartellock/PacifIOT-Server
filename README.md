@@ -10,5 +10,5 @@ Posts all of the data to an apache web page which was then parsed by a simple an
 This was used to display accelerometer data for the microcontroller, Fitbit for babies! 
 
 Output/Microcontroller state change. 
-The webpage also had some urls to set the state of the yaml file, the main script checks if there are any changes to the yaml file that werent caused by the script changing it, and ipso facto, sent out the appropriate command to the microcontroller to write the state to the microcontroller. 
-This was used to change the volume, change the song playing, play and pause audio, and set the LED brightness. 
+The app also could post urls to the apache webpage to set the state of the yaml file, the main script checks if there are any changes to the yaml file that werent caused by the script changing it, and send out the appropriate command to the microcontroller to write the state to the microcontroller. 
+This was used to change the volume, change the song playing, Toggle interactive modeplay and pause audio, and set the LED brightness. 
